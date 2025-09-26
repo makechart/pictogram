@@ -25,7 +25,7 @@ sample-icon ="""data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz
 module.exports =
   pkg:
     name: 'pictogram', version: '0.0.1'
-    extend: {name: "base", version: "0.0.1"}
+    extend: {name: "@makechart/base"}
     dependencies: [
       {name: "ldfile", version: \main, path: "index.min.js"}
       {name: "potrace-wasm", version: \main, path: "index.js", global: true}
