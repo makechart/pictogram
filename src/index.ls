@@ -181,6 +181,8 @@ mod = ({ctx, t}) ->
       [x, y] = [cw * (idx % c), ch * (Math.floor(idx / c))]
       [x, y] = [x + (cw * pad / 2), y + (ch * pad / 2)]
       tween n, {transform: "translate(#x, #y)"}
+      # d3 的 append 會把資料傳給子節點, tip 靠 evt.target ( 這個 use ) 的資料; 這裡自己掛上
+      use-of(n).__data__ = d
       if d._removing => return
       scale = Math.min((cw * (1 - pad)) / 256, (ch * (1 - pad)) / 256)
       tween use-of(n), do

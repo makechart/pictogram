@@ -12,6 +12,12 @@ pick = (keys) -> (c) ->
   c.legend.select keys
   c.parse!; c.bind!; c.resize!; c.render!
 
+# 滑到圖形上: tip 讀 evt.target 的資料
+hover = (sel, idx = 0) -> (c, ctx) ->
+  n = ctx.root.querySelectorAll(sel)[idx]
+  r = n.getBoundingClientRect!
+  n.dispatchEvent new MouseEvent(\mousemove, {bubbles: true, clientX: Math.round(r.x + r.width / 2), clientY: Math.round(r.y + r.height / 2)})
+
 mctest.suite do
   size: [480, 360]
   # 圖示是非同步描出來的 ( potrace-wasm ), 多等一點
@@ -29,6 +35,7 @@ mctest.suite do
     * name: "legend:bottom", data: \cat, config: {legend: {position: \bottom}}
     * name: "legend:pick", data: \cat, steps: pick <[Type-A Type-C]>
     * name: "update", data: \cat, steps: (c) -> d = mk 18, 7; c.set-raw d.raw, d.binding
+    * name: "hover", data: \cat, steps: hover 'use.data', 3
 
 # lite 版才有: 圖示放大與移除縮小的中間格
 mctest.suite do
