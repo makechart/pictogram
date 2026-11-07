@@ -1,5 +1,11 @@
 # Change Logs
 
+## v0.0.3
+
+ - fix bug: tooltip was empty since glyphs didn't carry their data ( regression in 0.0.2 )
+ - add hover test case
+
+
 ## v0.0.2
 
  - extend the lite base ( `@makechart/base` `lite/index.html`, no d3 ): needs `@makechart/base` >= 0.2.0
