@@ -25,7 +25,8 @@ sample-icon ="""data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz
 module.exports =
   pkg:
     name: 'pictogram', version: '0.0.1'
-    extend: {name: "@makechart/base"}
+    # lite: 不帶 d3 的 base. 補間改用 chart.anim, 可以逐格錄影 ( 見 @plotdb/chart utils/anim )
+    extend: {name: "@makechart/base", path: "lite/index.html"}
     dependencies: [
       {name: "ldfile", version: \main, path: "index.min.js"}
       {name: "potrace-wasm", version: \main, path: "index.js", global: true}
@@ -35,7 +36,9 @@ module.exports =
     pubsub.fire \init, mod: mod({ctx, t})
 
 mod = ({ctx, t}) ->
-  {chart,d3,debounce,ldfile,loadFromCanvas} = ctx
+  {chart,ldfile,loadFromCanvas} = ctx
+  {anim: {join}} = chart.utils
+  svgns = "http://www.w3.org/2000/svg"
   utils.trace-svg = (opt) -> new Promise (res, rej) ->
     size = opt.size or 256
     light = opt.light or 0.5
@@ -82,13 +85,14 @@ mod = ({ctx, t}) ->
     name: type: \N
   init: ->
     @tint = tint = new chart.utils.tint!
-    @g = Object.fromEntries <[view legend]>.map ~> [it, d3.select(@layout.get-group it)]
-    @g.defs = d3.select(@svg).append \g .attr \class, \defs
-    @defs = @g.defs.append \defs
+    @g = Object.fromEntries <[view legend]>.map ~> [it, @layout.get-group it]
+    @g.defs = @svg.appendChild document.createElementNS(svgns, \g)
+    @g.defs.setAttribute \class, \defs
+    @defs = @g.defs.appendChild document.createElementNS(svgns, \defs)
     @tip = new chart.utils.tip {
       root: @root
       accessor: ({evt}) ~>
-        if !(evt.target and d = d3.select(evt.target).datum!) => return null
+        if !(evt.target and d = evt.target.__data__) => return null
         return {name: (if d.cat => "#{d.cat} / " else '') + (d.name or ''), value: ''}
       range: ~> @layout.get-node \view .getBoundingClientRect!
     }
@@ -96,7 +100,7 @@ mod = ({ctx, t}) ->
       layout: @layout
       name: \legend
       root: @root
-      shape: (d) -> d3.select(@).attr \fill, tint.get d.key
+      shape: (d) -> @setAttribute \fill, tint.get d.key
     @legend.on \select, ~> @parse!; @bind!; @resize!; @render!
   destroy: -> if @tip => @tip.destroy!
   parse: ->
@@ -139,7 +143,7 @@ mod = ({ctx, t}) ->
     @root.querySelector('.pdl-layout').classList.toggle \legend-bottom, (@cfg.legend.position == \bottom)
     @legend.update!
     @layout.update false
-    @tint.set(@cfg.palette.colors.map -> it.value or it)
+    @tint.set @cfg.palette
 
   render: ->
     {tint,cfg} = @
@@ -147,61 +151,57 @@ mod = ({ctx, t}) ->
     [r,c] = [q or 1, Math.ceil(@sum / q) or 1]
     box = @layout.get-box \view
     [cw ,ch] = [box.width / c, box.height / r]
-    @g.view.selectAll \g.data .data @parsed, (-> it._idx)
-      ..exit!
-        .each (d,i) ->
-          d._removing = true
-          d3.select(@).select \use.data
-            .transition!duration 150
-            .attr \x, cw/2
-            .attr \y, cw/2
-            .attr \opacity, 0
-            .attr \transform, "scale(0,0)"
-      ..exit!
-        .transition!delay 150
-          .remove!
-      ..enter!append \g
-        .attr \class, \data
-        .attr \transform, (d,i) ->
-          idx = d._order
-          [x, y] = [cw * (idx % c), ch * (Math.floor(idx / c))]
-          "translate(#x, #y)"
-        .append \use
-          .attr \class, \data
-          .attr \opacity, 0
-          .attr \x, cw/2
-          .attr \y, ch/2
-          .attr \transform, "scale(0,0)"
+    tween = (n, attrs, opt = {}) ~> @anim.tween n, attrs, {duration: 350} <<< opt
+    use-of = (n) -> n.querySelector \use.data
+    gj = join root: @g.view, tag: \g, cls: \data, data: @parsed, key: (-> it._idx)
+    # 移除的先把圖示縮掉再拿掉 ( d3 版的移除會被接著的補間取消, 縮掉的 g 一直留著 )
+    gj.exit.map (n) ->
+      d = n.__data__
+      d._removing = true
+      tween use-of(n), {x: cw/2, y: ch/2, opacity: 0, transform: "scale(0,0)"}, do
+        duration: 150
+        end: -> if n.__data__._removing => n.remove!
+    gj.enter.map (n) ->
+      d = n.__data__
+      idx = d._order
+      [x, y] = [cw * (idx % c), ch * (Math.floor(idx / c))]
+      n.setAttribute \transform, "translate(#x, #y)"
+      n.appendChild document.createElementNS(svgns, \use)
+        ..setAttribute \class, \data
+        ..setAttribute \opacity, 0
+        ..setAttribute \x, cw/2
+        ..setAttribute \y, ch/2
+        ..setAttribute \transform, "scale(0,0)"
 
-    @g.view.selectAll \g.data
-      .transition!duration 350
-      .attr \transform, (d,i) ->
-        pad = cfg.padding or 0
-        idx = d._order
-        [x, y] = [cw * (idx % c), ch * (Math.floor(idx / c))]
-        [x, y] = [x + (cw * pad / 2), y + (ch * pad / 2)]
-        "translate(#x, #y)"
-    @g.view.selectAll \g.data
-      .each (d,i) ->
-        if d._removing => return
-        pad = cfg.padding or 0
-        scale = Math.min((cw * (1 - pad)) / 256, (ch * (1 - pad)) / 256)
-        d3.select(@).select \use.data
-          .transition!duration 350
-          .attr \fill, (d,i) -> tint.get d.cat
-          .attr \opacity, 1
-          .attr \x, 0
-          .attr \y, 0
-          .attr \transform, "scale(#scale,#scale)"
-          .attr \href, '#glyph'
+    # 同 d3 版: 移除中的 g 也一起移動 ( 只是圖示已經縮掉 )
+    Array.from(@g.view.querySelectorAll ':scope > g.data').map (n) ->
+      d = n.__data__
+      pad = cfg.padding or 0
+      idx = d._order
+      [x, y] = [cw * (idx % c), ch * (Math.floor(idx / c))]
+      [x, y] = [x + (cw * pad / 2), y + (ch * pad / 2)]
+      tween n, {transform: "translate(#x, #y)"}
+      if d._removing => return
+      scale = Math.min((cw * (1 - pad)) / 256, (ch * (1 - pad)) / 256)
+      tween use-of(n), do
+        fill: tint.get d.cat
+        opacity: 1
+        x: 0
+        y: 0
+        transform: "scale(#scale,#scale)"
+        href: '#glyph'
 
     q = if @p => @p else Promise.resolve!
     @p = q
       .then ~>
         file = ((@cfg.shape.glyph or []).0 or {})
         url = file.dataurl or sample-icon
+        # 圖示與門檻沒變就不必重描 ( 描圖要跑 potrace, 不便宜 )
+        if (key = "#{@cfg.shape.threshold}:#url") == @_glyph-key => return
+        @_glyph-key = key
         utils.trace-svg {file: url, light: @cfg.shape.threshold}
       .then (svg) ~>
+        if !svg => return
         div = document.createElement(\div)
         div.innerHTML = svg
         g = div.querySelector('g').cloneNode(true)
