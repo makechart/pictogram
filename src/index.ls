@@ -76,9 +76,9 @@ mod = ({ctx, t}) ->
     tip: \tip
   }) <<<
     shape:
-      glyph: type: \upload
-      threshold: type: \number, default: 0.5, min: 0, max: 1, step: 0.01
-    padding: type: \number, default: 0, min: -1, max: 1, step: 0.01
+      glyph: type: \upload, desc: {en: "image used as the icon, traced into a one-color shape; a person icon is used when empty", "zh-TW": "當作圖示的圖片，會描成單色的形狀；未上傳時使用人形圖示"}
+      threshold: type: \number, default: 0.5, min: 0, max: 1, step: 0.01, desc: {en: "share of the uploaded image's pixels, darkest first, that become the shape when tracing ( 0 to 1 ); higher makes the icon fuller", "zh-TW": "描圖時由最暗算起，多少比例的像素會成為形狀 ( 0 到 1 )；越大圖示越飽滿"}
+    padding: type: \number, default: 0, min: -1, max: 1, step: 0.01, desc: {en: "space around each icon as a share of its cell ( -1 to 1 ); negative values enlarge the icons so they overlap", "zh-TW": "每個圖示周圍的留白，佔格子大小的比例 ( -1 到 1 )；負值會放大圖示使其互相重疊"}
   dimension:
     value: type: \R
     cat: type: \C
